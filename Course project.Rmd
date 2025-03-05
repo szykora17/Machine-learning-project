@@ -1,0 +1,134 @@
+---
+title: "Course project Practical Machine learning"
+author: "Bence Szikora"
+date: "2025-03-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Overview
+
+In this project I analyzed a Weight Lifting Exercise Dataset and use some data about personal activity to predict the way how the lifting is performed. A few different prediction algorithm was tested and the best model was choosen based on accuracy and error rates.       
+
+## Data
+
+The training data for this project are available here: 
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The test data are available here:
+
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+The data for this project come from this source: 
+http://groupware.les.inf.puc-rio.br/har
+
+## Loading and formatting data
+
+Load the required R packages, and data files. I also set the seed and got a brief overview about the data
+
+```{r}
+library(corrplot)
+library(caret)
+training = read.csv("training_ds_machine_learning")
+testing = read.csv("testing_ds_machine_learning")
+#str(training)
+set.seed(417)
+
+```
+
+The first step was to choose the variables for the prediction. I checked for  near-zero-variance (NZV) variables and I excluded them from the analysis. Next I checked for variables with NA values and I also excluded them. Finally I removed the identification variables as well.
+
+```{r}
+#removing zero covariates
+
+nsv=nearZeroVar(training)
+training=training[,-nsv]
+
+
+#removing columns with NA values
+na= sapply(training,function(x) sum(is.na(x))==0)
+training=training[,na==TRUE]
+
+
+#removing the first 5 columns, because they are just for identification
+training=training[,-(1:5)]
+```
+
+I also made some data analysis with the cleaned dataset. I checked the type of the variables and the basic information about the numeric ones. I made a correlation analysis as well to see whether this variable are highly correlated with each other or not. I found that only the 5% of the variables were highly correlated so I rejected the idea to make a PCA.
+
+```{r}
+#Checking the class of the variables
+#sapply(training, function(x) class(x))
+
+#I checked the basic information about the dataset
+#summary(training)
+
+
+#Checking the correlations between the variables, few are highly (abs(cor)>0.75) correlated (only 5%)
+cor=cor(training[,-54])
+sum(abs(cor)>0.75)/sum(abs(cor)<=0.75)
+#visualizing the correlation just because its nice
+corrplot(corr = cor,type="lower", tl.col = "black",tl.cex = 0.4)
+```
+
+## Cross validation
+
+I made a testing and a training group for cross validation with random sampling.
+
+```{r}
+#cross validation, with random subsampling
+
+inTrain = createDataPartition(training$classe,p=0.7,list=FALSE)
+Train = training[inTrain,]
+Test = training[-inTrain,]
+```
+
+
+## Prediction models
+
+I choosed 3 different model to predict the classe variable in the Test set. 
+
+Generalized Boosted model (gbm):
+
+```{r,results='hide'}
+##Prediction models
+#gbm
+
+gbm= train(classe~.,method="gbm",data=Train)
+```
+
+```{r}
+predict_gbm=predict(gbm,Test)
+conf_gbm =confusionMatrix(predict_gbm,as.factor(Test$classe))
+conf_gbm
+```
+
+Decision Tree model:
+
+```{r}
+#tree
+tree=train(classe~.,method="rpart",data=Train)
+predict_tree=predict(tree,Test)
+conf_tree=confusionMatrix(predict_tree,as.factor(Test$classe))
+conf_tree
+```
+
+Random forest model:
+
+```{r}
+#forest
+forest=train(classe~.,method="rf",data=Train)
+predict_forest= predict(forest,Test)
+conf_forest=confusionMatrix(predict_forest,as.factor(Test$classe))
+conf_forest
+```
+
+
+
+## Results
+
+Based on the predictive accuracy (gbm=98,74%, Decision Tree= 57,01%, random forest= 99,64%), and the error rates and kappa values, the random forest model performed the best, so I will use this one for my predictions on the quiz dataset. Nevertheless the gbm model was also very powerful.
+
